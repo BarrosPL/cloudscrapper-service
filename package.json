@@ -1,0 +1,18 @@
+{
+  "name": "cloudscraper-service",
+  "version": "1.0.0",
+  "description": "CloudScraper alternative to ScrapingBee",
+  "main": "cloudscraper-service.js",
+  "scripts": {
+    "start": "node cloudscraper-service.js",
+    "dev": "nodemon cloudscraper-service.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
