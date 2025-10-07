@@ -56,7 +56,7 @@ app.post('/scrape', async (req, res) => {
     // Fazer a requisição com retry logic
     let response;
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 2;
 
     while (attempts < maxAttempts) {
       try {
