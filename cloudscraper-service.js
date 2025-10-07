@@ -33,6 +33,7 @@ app.post('/scrape', async (req, res) => {
 
   try {
     console.log('🚀 Iniciando CloudScraper para:', url);
+    console.log('📝 Instruções:', instructions);
     
     // Configurações do CloudScraper
     const userAgents = [
@@ -42,7 +43,7 @@ app.post('/scrape', async (req, res) => {
     ];
 
     const headers = {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', // ✅ REMOVER image/webp,image/apng
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept-Encoding': 'gzip, deflate, br',
       'Cache-Control': 'no-cache',
@@ -51,7 +52,7 @@ app.post('/scrape', async (req, res) => {
       'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)]
     };
 
-    console.log('📤 Fazendo requisição com headers customizados...');
+    console.log('📤 Fazendo requisição com headers otimizados...');
     
     // Fazer a requisição com retry logic
     let response;
@@ -94,16 +95,30 @@ app.post('/scrape', async (req, res) => {
     if (response.status === 200 && response.data) {
       console.log('📝 Processando HTML, tamanho:', response.data.length);
       
-      // Processar HTML
+      // ✅ PROCESSAMENTO MELHORADO PARA IGNORAR RECURSOS DESNECESSÁRIOS
       const text = response.data
+        // Remover tags de mídia e recursos desnecessários
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+        .replace(/<img[^>]*>/gi, ' ') // ✅ REMOVER IMAGENS
+        .replace(/<video[^>]*>.*?<\/video>/gi, ' ') // ✅ REMOVER VÍDEOS
+        .replace(/<audio[^>]*>.*?<\/audio>/gi, ' ') // ✅ REMOVER ÁUDIO
+        .replace(/<source[^>]*>/gi, ' ') // ✅ REMOVER SOURCES
+        .replace(/<track[^>]*>/gi, ' ') // ✅ REMOVER TRACKS
+        .replace(/<iframe[^>]*>.*?<\/iframe>/gi, ' ') // ✅ REMOVER IFRAMES
+        .replace(/<object[^>]*>.*?<\/object>/gi, ' ') // ✅ REMOVER OBJECTS
+        .replace(/<embed[^>]*>/gi, ' ') // ✅ REMOVER EMBEDS
+        .replace(/<canvas[^>]*>.*?<\/canvas>/gi, ' ') // ✅ REMOVER CANVAS
+        .replace(/<svg[^>]*>.*?<\/svg>/gi, ' ') // ✅ REMOVER SVGs
+        .replace(/<picture[^>]*>.*?<\/picture>/gi, ' ') // ✅ REMOVER PICTURES
+        // Remover outras tags HTML
         .replace(/<[^>]*>/g, ' ')
+        // Limpar espaços
         .replace(/\s+/g, ' ')
         .trim()
         .substring(0, 50000);
 
-      // Extrair links
+      // ✅ EXTRAIR LINKS FILTRANDO ARQUIVOS BAIXÁVEIS
       console.log('🔍 Extraindo links...');
       
       const linkPatterns = [
@@ -123,20 +138,33 @@ app.post('/scrape', async (req, res) => {
 
       console.log(`📎 Links brutos encontrados: ${allMatches.length}`);
 
-      // Processar links
+      // ✅ PROCESSAR LINKS IGNORANDO ARQUIVOS BAIXÁVEIS
       const processedLinks = allMatches
         .map(link => {
           try {
             let cleanLink = link.split('#')[0].split('?')[0];
             
-            // Ignorar links inválidos
+            // ✅ IGNORAR LINKS DE ARQUIVOS BAIXÁVEIS E RECURSOS DESNECESSÁRIOS
+            const downloadExtensions = [
+              '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg',
+              '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
+              '.mp3', '.wav', '.ogg', '.m4a',
+              '.pdf', '.zip', '.rar', '.7z', '.tar', '.gz',
+              '.exe', '.dmg', '.pkg', '.deb', '.rpm'
+            ];
+            
+            const isDownloadable = downloadExtensions.some(ext => 
+              cleanLink.toLowerCase().endsWith(ext)
+            );
+            
             if (cleanLink.startsWith('javascript:') || 
                 cleanLink.startsWith('mailto:') || 
                 cleanLink.startsWith('tel:') ||
                 cleanLink.startsWith('data:') ||
                 cleanLink.trim() === '' ||
                 cleanLink === '/' ||
-                cleanLink === '#') {
+                cleanLink === '#' ||
+                isDownloadable) { // ✅ FILTRAR ARQUIVOS BAIXÁVEIS
               return null;
             }
 
@@ -184,7 +212,7 @@ app.post('/scrape', async (req, res) => {
         .filter((link, index, array) => array.indexOf(link) === index)
         .slice(0, 10);
 
-      console.log(`🎯 Links processados: ${processedLinks.length}`);
+      console.log(`🎯 Links processados (filtrados): ${processedLinks.length}`);
 
       return res.json({
         url: url,
@@ -224,7 +252,7 @@ app.post('/scrape', async (req, res) => {
   }
 });
 
-// Endpoint batch (opcional)
+// ✅ Endpoint batch ATUALIZADO
 app.post('/scrape-batch', async (req, res) => {
   const { urls, instructions } = req.body;
   
@@ -237,6 +265,7 @@ app.post('/scrape-batch', async (req, res) => {
 
   try {
     console.log(`📦 Processando lote com ${urls.length} URLs`);
+    console.log(`📝 Instruções do lote: ${instructions}`);
     
     const urlsToProcess = urls.slice(0, 5); // Limitar para teste
     const results = [];
@@ -248,10 +277,12 @@ app.post('/scrape-batch', async (req, res) => {
       try {
         console.log(`🌐 [${i + 1}/${urlsToProcess.length}] Processando: ${url}`);
         
-        // Reutilizar a lógica do endpoint individual
-        const response = await axios.post('http://localhost:3001/scrape', {
+        // ✅ Reutilizar a lógica do endpoint individual com as mesmas instruções
+        const response = await axios.post(`http://localhost:${PORT}/scrape`, {
           url: url,
-          instructions: instructions
+          instructions: instructions // ✅ PASSAR AS INSTRUÇÕES
+        }, {
+          timeout: 35000
         });
 
         if (response.data.success) {
@@ -260,13 +291,15 @@ app.post('/scrape-batch', async (req, res) => {
             url: url,
             mainContent: response.data.mainContent,
             contentLength: response.data.contentLength,
-            links: response.data.links
+            links: response.data.links,
+            instructions: instructions // ✅ INCLUIR INSTRUÇÕES NA RESPOSTA
           });
         } else {
           results.push({
             success: false,
             url: url,
-            error: response.data.error
+            error: response.data.error,
+            instructions: instructions // ✅ INCLUIR INSTRUÇÕES NA RESPOSTA
           });
         }
 
@@ -275,7 +308,8 @@ app.post('/scrape-batch', async (req, res) => {
         results.push({
           success: false,
           url: url,
-          error: error.message
+          error: error.message,
+          instructions: instructions // ✅ INCLUIR INSTRUÇÕES NA RESPOSTA
         });
       }
 
@@ -297,13 +331,17 @@ app.post('/scrape-batch', async (req, res) => {
       failed: results.length - successful.length,
       combinedContent: combinedContent,
       totalContentLength: combinedContent.length,
-      allResults: results
+      allResults: results,
+      instructions: instructions, // ✅ INCLUIR INSTRUÇÕES NA RESPOSTA FINAL
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
+    console.error('💥 Erro no lote:', error.message);
     res.status(500).json({
       success: false,
-      error: 'Erro no lote: ' + error.message
+      error: 'Erro no lote: ' + error.message,
+      instructions: instructions // ✅ INCLUIR INSTRUÇÕES NO ERRO
     });
   }
 });
@@ -321,4 +359,6 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🟢 CloudScraper Microservice running on port ${PORT}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/`);
+  console.log(`🚫 Configurado para ignorar: imagens, vídeos, áudio e arquivos baixáveis`);
+  console.log(`📝 Segue instruções da planilha`);
 });
