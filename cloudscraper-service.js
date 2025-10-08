@@ -3,6 +3,7 @@ const axios = require('axios');
 const cors = require('cors');
 
 const app = express();
+const PORT = process.env.PORT || 3001; // ✅ MOVIDO para o TOPO
 
 // Middlewares
 app.use(cors());
@@ -43,7 +44,7 @@ app.post('/scrape', async (req, res) => {
     ];
 
     const headers = {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', // ✅ SEM imagens
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept-Encoding': 'gzip, deflate, br',
       'Cache-Control': 'no-cache',
@@ -68,14 +69,12 @@ app.post('/scrape', async (req, res) => {
           headers: headers,
           timeout: 30000,
           responseType: 'text',
-          // Configurações para bypass de proteções
           maxRedirects: 5,
           validateStatus: function (status) {
-            return status >= 200 && status < 400; // Aceitar redirects
+            return status >= 200 && status < 400;
           }
         });
 
-        // Se chegou aqui, a requisição foi bem-sucedida
         break;
 
       } catch (error) {
@@ -85,7 +84,6 @@ app.post('/scrape', async (req, res) => {
           throw error;
         }
         
-        // Aguardar antes da próxima tentativa
         await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
       }
     }
@@ -95,34 +93,31 @@ app.post('/scrape', async (req, res) => {
     if (response.status === 200 && response.data) {
       console.log('📝 Processando HTML, tamanho:', response.data.length);
       
-      // ✅ PROCESSAMENTO MELHORADO PARA IGNORAR TODOS OS RECURSOS DESNECESSÁRIOS
+      // PROCESSAMENTO DO HTML
       const text = response.data
-        // Remover tags de mídia e recursos desnecessários
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-        .replace(/<link[^>]*>/gi, ' ') // ✅ REMOVER LINKS (CSS, favicon, etc)
-        .replace(/<meta[^>]*>/gi, ' ') // ✅ REMOVER META TAGS
-        .replace(/<img[^>]*>/gi, ' ') // ✅ REMOVER IMAGENS
-        .replace(/<video[^>]*>.*?<\/video>/gi, ' ') // ✅ REMOVER VÍDEOS
-        .replace(/<audio[^>]*>.*?<\/audio>/gi, ' ') // ✅ REMOVER ÁUDIO
-        .replace(/<source[^>]*>/gi, ' ') // ✅ REMOVER SOURCES
-        .replace(/<track[^>]*>/gi, ' ') // ✅ REMOVER TRACKS
-        .replace(/<iframe[^>]*>.*?<\/iframe>/gi, ' ') // ✅ REMOVER IFRAMES
-        .replace(/<object[^>]*>.*?<\/object>/gi, ' ') // ✅ REMOVER OBJECTS
-        .replace(/<embed[^>]*>/gi, ' ') // ✅ REMOVER EMBEDS
-        .replace(/<canvas[^>]*>.*?<\/canvas>/gi, ' ') // ✅ REMOVER CANVAS
-        .replace(/<svg[^>]*>.*?<\/svg>/gi, ' ') // ✅ REMOVER SVGs
-        .replace(/<picture[^>]*>.*?<\/picture>/gi, ' ') // ✅ REMOVER PICTURES
-        .replace(/<noscript[^>]*>.*?<\/noscript>/gi, ' ') // ✅ REMOVER NOSCRIPT
-        .replace(/<template[^>]*>.*?<\/template>/gi, ' ') // ✅ REMOVER TEMPLATES
-        // Remover outras tags HTML
+        .replace(/<link[^>]*>/gi, ' ')
+        .replace(/<meta[^>]*>/gi, ' ')
+        .replace(/<img[^>]*>/gi, ' ')
+        .replace(/<video[^>]*>.*?<\/video>/gi, ' ')
+        .replace(/<audio[^>]*>.*?<\/audio>/gi, ' ')
+        .replace(/<source[^>]*>/gi, ' ')
+        .replace(/<track[^>]*>/gi, ' ')
+        .replace(/<iframe[^>]*>.*?<\/iframe>/gi, ' ')
+        .replace(/<object[^>]*>.*?<\/object>/gi, ' ')
+        .replace(/<embed[^>]*>/gi, ' ')
+        .replace(/<canvas[^>]*>.*?<\/canvas>/gi, ' ')
+        .replace(/<svg[^>]*>.*?<\/svg>/gi, ' ')
+        .replace(/<picture[^>]*>.*?<\/picture>/gi, ' ')
+        .replace(/<noscript[^>]*>.*?<\/noscript>/gi, ' ')
+        .replace(/<template[^>]*>.*?<\/template>/gi, ' ')
         .replace(/<[^>]*>/g, ' ')
-        // Limpar espaços
         .replace(/\s+/g, ' ')
         .trim()
         .substring(0, 50000);
 
-      // ✅ EXTRAIR LINKS FILTRANDO TODOS OS ARQUIVOS DESNECESSÁRIOS
+      // EXTRAIR LINKS
       console.log('🔍 Extraindo links...');
       
       const linkPatterns = [
@@ -142,29 +137,20 @@ app.post('/scrape', async (req, res) => {
 
       console.log(`📎 Links brutos encontrados: ${allMatches.length}`);
 
-      // ✅ PROCESSAR LINKS IGNORANDO TODOS OS ARQUIVOS DESNECESSÁRIOS
+      // PROCESSAR LINKS
       const processedLinks = allMatches
         .map(link => {
           try {
             let cleanLink = link.split('#')[0].split('?')[0];
             
-            // ✅ LISTA COMPLETA DE EXTENSÕES PARA IGNORAR
             const ignoredExtensions = [
-              // Imagens
               '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico', '.tiff', '.tif',
-              // Vídeos
               '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mkv', '.3gp',
-              // Áudio
               '.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma',
-              // Arquivos
               '.pdf', '.zip', '.rar', '.7z', '.tar', '.gz', '.iso', '.dmg',
-              // Executáveis
               '.exe', '.msi', '.dmg', '.pkg', '.deb', '.rpm', '.apk',
-              // Documentos
               '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt',
-              // Fontes
               '.ttf', '.otf', '.woff', '.woff2', '.eot',
-              // CSS e Favicon
               '.css', '.less', '.scss', '.sass',
               'favicon.ico', 'favicon.png'
             ];
@@ -186,7 +172,7 @@ app.post('/scrape', async (req, res) => {
                 cleanLink.trim() === '' ||
                 cleanLink === '/' ||
                 cleanLink === '#' ||
-                isIgnored) { // ✅ FILTRAR TODOS OS ARQUIVOS DESNECESSÁRIOS
+                isIgnored) {
               return null;
             }
 
@@ -196,12 +182,10 @@ app.post('/scrape', async (req, res) => {
               return urlObj.origin + cleanLink;
             }
             
-            // Se já é URL absoluta
             if (cleanLink.startsWith('http')) {
               return cleanLink;
             }
             
-            // URLs relativas sem barra
             if (!cleanLink.startsWith('http') && !cleanLink.startsWith('/')) {
               const urlObj = new URL(url);
               if (cleanLink.includes('.') || cleanLink.length > 3) {
@@ -226,7 +210,6 @@ app.post('/scrape', async (req, res) => {
                                  linkObj.hostname.includes('.org') || 
                                  linkObj.hostname.includes('.net');
             
-            // ✅ FILTRAR MAIS RECURSOS POR DOMÍNIO
             const isResourceDomain = 
               linkObj.hostname.includes('fonts.googleapis.com') ||
               linkObj.hostname.includes('fonts.gstatic.com') ||
@@ -264,7 +247,6 @@ app.post('/scrape', async (req, res) => {
   } catch (error) {
     console.log('❌ CloudScraper error:', error.message);
     
-    // Detectar tipo de erro
     let errorType = 'unknown';
     if (error.code === 'ECONNABORTED') errorType = 'timeout';
     if (error.response?.status === 403) errorType = 'blocked';
@@ -283,9 +265,9 @@ app.post('/scrape', async (req, res) => {
   }
 });
 
-// ✅ Endpoint batch ATUALIZADO
+// ✅✅✅ Endpoint batch CORRIGIDO
 app.post('/scrape-batch', async (req, res) => {
-  const { urls, instructions } = req.body;
+  const { urls, instructions, main_url } = req.body;
   
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ 
@@ -296,27 +278,30 @@ app.post('/scrape-batch', async (req, res) => {
 
   try {
     console.log(`📦 Processando lote com ${urls.length} URLs`);
-    console.log(`📝 Instruções do lote: ${instructions}`);
+    console.log(`📝 Instruções: ${instructions}`);
+    console.log(`🌐 URL principal: ${main_url}`);
     
-    const urlsToProcess = urls.slice(0, 5);
+    // ✅ REDUZIR para evitar timeout
+    const urlsToProcess = urls.slice(0, 3);
     const results = [];
 
-    // Processar sequencialmente para evitar bloqueios
+    // ✅ PROCESSAR SEQUENCIALMENTE COM MELHOR TRATAMENTO
     for (let i = 0; i < urlsToProcess.length; i++) {
       const url = urlsToProcess[i];
       
       try {
-        console.log(`🌐 [${i + 1}/${urlsToProcess.length}] Processando: ${url}`);
+        console.log(`🔄 [${i + 1}/${urlsToProcess.length}] Processando: ${url}`);
         
-        // ✅ Reutilizar a lógica do endpoint individual
-        const response = await axios.post(`http://localhost:${PORT}/scrape`, {
+        // ✅ CORREÇÃO: Usar localhost:3001 fixo (PORT já definido no topo)
+        const response = await axios.post(`http://localhost:3001/scrape`, {
           url: url,
           instructions: instructions
         }, {
-          timeout: 35000
+          timeout: 45000 // ✅ AUMENTAR TIMEOUT
         });
 
         if (response.data.success) {
+          console.log(`✅ Sucesso: ${url}`);
           results.push({
             success: true,
             url: url,
@@ -326,6 +311,7 @@ app.post('/scrape-batch', async (req, res) => {
             instructions: instructions
           });
         } else {
+          console.log(`❌ Falha no scraping: ${url} - ${response.data.error}`);
           results.push({
             success: false,
             url: url,
@@ -335,28 +321,32 @@ app.post('/scrape-batch', async (req, res) => {
         }
 
       } catch (error) {
-        console.log(`❌ Erro em ${url}:`, error.message);
+        console.log(`💥 Erro HTTP em ${url}:`, error.message);
         results.push({
           success: false,
           url: url,
-          error: error.message,
+          error: `HTTP Error: ${error.message}`,
           instructions: instructions
         });
       }
 
-      // Pausa entre requests
+      // ✅ PAUSA MAIOR ENTRE REQUESTS
       if (i < urlsToProcess.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('⏳ Aguardando 3 segundos...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
 
     const successful = results.filter(r => r.success);
-    const combinedContent = successful
-      .map(r => `--- ${r.url} ---\n${r.mainContent}`)
-      .join('\n\n');
+    console.log(`📊 Resultado: ${successful.length}/${urlsToProcess.length} sucessos`);
+
+    // ✅ MELHOR COMBINAÇÃO DE CONTEÚDO
+    const combinedContent = successful.length > 0 
+      ? successful.map(r => `--- URL: ${r.url} ---\n${r.mainContent}`).join('\n\n')
+      : 'Nenhum conteúdo extraído com sucesso';
 
     res.json({
-      success: true,
+      success: successful.length > 0,
       urlsProcessed: urlsToProcess.length,
       successful: successful.length,
       failed: results.length - successful.length,
@@ -364,14 +354,15 @@ app.post('/scrape-batch', async (req, res) => {
       totalContentLength: combinedContent.length,
       allResults: results,
       instructions: instructions,
+      main_url: main_url, // ✅ MANTER URL PRINCIPAL
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('💥 Erro no lote:', error.message);
+    console.error('💥 Erro crítico no lote:', error.message);
     res.status(500).json({
       success: false,
-      error: 'Erro no lote: ' + error.message,
+      error: 'Erro no processamento do lote: ' + error.message,
       instructions: instructions
     });
   }
@@ -386,7 +377,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🟢 CloudScraper Microservice running on port ${PORT}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/`);
